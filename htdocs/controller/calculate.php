@@ -86,8 +86,8 @@ function prioritizeNotes($amount, $combinations) {
 function getCombinations($amount) {
     $results = [];
 
-    // Hitung batas kedalaman berdasarkan jumlah dibagi dengan pecahan uang terkecil
-    $depthLimit = ceil($amount / 100);  // Pecahan uang terkecil adalah 100
+    // Batasi kedalaman pencarian ke maksimal 3
+    $depthLimit = 3;
 
     // Dapatkan pecahan uang yang sesuai berdasarkan jumlah
     $denominations = getDenominations($amount);
