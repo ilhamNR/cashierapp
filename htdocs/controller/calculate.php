@@ -1,11 +1,11 @@
 <?php
 
-// Definisikan pecahan uang yang tersedia
+// Definisikan denominasi koin dan uang kertas
 $coinDenominations = [100, 200, 500];
 $noteDenominations = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
 
 // Fungsi untuk menemukan kombinasi
-function findCombinations($amount, $denominations, $partial = [], $depthLimit) {
+function findCombinations($amount, $denominations, $partial, $depthLimit) {
     $sum = array_sum($partial);
 
     // Periksa apakah jumlah sementara sama dengan target
@@ -13,7 +13,7 @@ function findCombinations($amount, $denominations, $partial = [], $depthLimit) {
         return [implode(" + ", $partial)];
     }
 
-    // Jika jumlah sementara lebih besar dari target atau batas kedalaman tercapai, hentikan penjelajahan jalur ini
+    // Jika jumlah sementara lebih besar dari jumlah target atau batas kedalaman tercapai, hentikan eksplorasi jalur ini
     if ($sum > $amount || count($partial) >= $depthLimit) {
         return [];
     }
@@ -26,18 +26,18 @@ function findCombinations($amount, $denominations, $partial = [], $depthLimit) {
     return $combinations;
 }
 
-// Fungsi untuk mendapatkan pecahan uang yang sesuai berdasarkan jumlah
+// Fungsi untuk mendapatkan denominasi yang sesuai berdasarkan jumlah
 function getDenominations($amount) {
     global $coinDenominations, $noteDenominations;
 
-    // Jika jumlahnya tepat dibagi oleh pecahan uang kertas, gunakan hanya uang kertas
+    // Jika jumlahnya tepat dibagi oleh denominasi uang kertas manapun, gunakan hanya uang kertas
     foreach ($noteDenominations as $note) {
         if ($amount % $note == 0) {
             return $noteDenominations;
         }
     }
 
-    // Jika tidak, gunakan uang kertas terlebih dahulu, lalu koin untuk sisanya
+    // Jika tidak, gunakan uang kertas terlebih dahulu, kemudian koin untuk sisa pembayaran
     return array_merge($noteDenominations, $coinDenominations);
 }
 
@@ -58,38 +58,14 @@ function hasSubsetSum($combo, $amount) {
     return false;
 }
 
-// Fungsi untuk memprioritaskan pecahan uang kertas
-function prioritizeNotes($amount, $combinations) {
-    global $noteDenominations;
-
-    $results = [];
-    foreach ($combinations as $paymentAmount => $combos) {
-        // Saring kombinasi yang menggunakan lebih dari satu pecahan uang kertas jika satu pecahan uang kertas dapat mencakup jumlahnya
-        $filteredCombos = array_filter($combos, function($combo) use ($paymentAmount) {
-            global $noteDenominations;
-            $comboArray = array_map('intval', explode(" + ", $combo));
-            $noteCount = count(array_filter($comboArray, function($value) use ($noteDenominations) {
-                return in_array($value, $noteDenominations);
-            }));
-            return $noteCount <= 1;
-        });
-
-        if (!empty($filteredCombos)) {
-            $results[$paymentAmount] = $filteredCombos;
-        }
-    }
-
-    return $results;
-}
-
 // Fungsi utama untuk menangani permintaan
 function getCombinations($amount) {
     $results = [];
 
-    // Batasi kedalaman pencarian ke maksimal 3
+    // Batasi kedalaman pencarian maksimal menjadi 3
     $depthLimit = 3;
 
-    // Dapatkan pecahan uang yang sesuai berdasarkan jumlah
+    // Dapatkan denominasi yang sesuai berdasarkan jumlah
     $denominations = getDenominations($amount);
 
     // Hitung kombinasi untuk setiap jumlah pembayaran
@@ -104,15 +80,16 @@ function getCombinations($amount) {
             });
 
             if (!empty($filteredCombos)) {
-                $results[$paymentAmount] = $filteredCombos;
+                $results[] = $paymentAmount;
             }
         }
     }
 
-    // Prioritaskan pecahan uang kertas
-    $results = prioritizeNotes($amount, $results);
+    // Hapus nilai duplikat dan urutkan opsi pembayaran
+    $uniquePaymentOptions = array_unique($results);
+    sort($uniquePaymentOptions);
 
-    return $results;
+    return $uniquePaymentOptions;
 }
 
 // Periksa apakah permintaan adalah permintaan POST
@@ -121,16 +98,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['amount'])) {
 
     // Validasi input
     if ($billAmount > 0) {
-        echo "Total Belanja Konsumen: Rp " . number_format($billAmount, 0, ',', '.') . ",-<br>";
-        echo "Kemungkinan uang yang di bayarkan konsumen adalah:<br>";
-        $combinations = getCombinations($billAmount);
-        foreach ($combinations as $paymentAmount => $combos) {
-            echo "Rp " . number_format($paymentAmount, 0, ',', '.') . "<br>";
-            foreach ($combos as $i => $combo) {
-                echo ($i + 1) . ". " . $combo . "<br>";
-            }
-            echo "<br>";
-        }
+        $output = [
+            'total_amount' => $billAmount,
+            'payment_options' => getCombinations($billAmount)
+        ];
+
+        // Output JSON
+        // header('Content-Type: application/json');
+        echo json_encode($output, JSON_PRETTY_PRINT);
     } else {
         echo "Silakan masukkan jumlah yang valid.";
     }
